@@ -45,6 +45,9 @@ def get_entities(x):
     if COUNTER % 10 == 0:
         print "%s documents tagged" % COUNTER
 
+    if COUNTER % SAVE_EVERY == 0:
+        df.to_csv(args.out, encoding='utf-8')
+
     COUNTER += 1
 
     sub = {
