@@ -6,7 +6,7 @@ from multiprocessing import Pool
 import numpy as np
 
 num_partitions = 10     # number of partitions to split dataframe
-num_cores = 4           # number of cores on your machine
+num_cores = 8           # number of cores on your machine
 
 
 def parallelize_dataframe(df, func):
