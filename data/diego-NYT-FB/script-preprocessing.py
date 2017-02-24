@@ -5,8 +5,8 @@ import spotlight
 from multiprocessing import Pool
 import numpy as np
 
-num_partitions = 10     # number of partitions to split dataframe
-num_cores = 8           # number of cores on your machine
+num_partitions = 500     # number of partitions to split dataframe
+num_cores = 2           # number of cores on your machine
 
 
 def parallelize_dataframe(df, func):
@@ -24,85 +24,96 @@ args = parser.parse_args()
 
 
 df = pd.read_csv(args.input, sep='\t', names=['dep', 'sub', 'obj', 'type', 'trigger', 'file', 'sentence', 'pos', 'relation'])
+entities = []
 
 types_dict = {
-    "LOCATION": ["DBpedia:Location","DBpedia:PopulatedPlace", "DBpedia:Place"],
+    "LOCATION": ["DBpedia:Location", "DBpedia:PopulatedPlace", "DBpedia:Place"],
     "PERSON": ['DBpedia:Person'],
     "ORGANIZATION": ['DBpedia:Organisation']
 }
 
 SPOTLIGHT_URL = 'http://localhost:2222/rest/annotate'
-SPOTLIGHT_CONF = 0.3
+SPOTLIGHT_CONF = 0.2
 SPOTLIGHT_SUPPORT = 1
-COUNTER = 0
-SAVE_EVERY = 1000
+COUNTER = 1
 
 
-def get_entities(x):
+def get_entities():
     global df
     global COUNTER
+    global entities
+    for index, x in df.iterrows():
 
-    if COUNTER % 10 == 0:
-        print "%s documents tagged" % COUNTER
+        if COUNTER % 10 == 0:
+            print "%s documents tagged" % COUNTER
 
-    if COUNTER % SAVE_EVERY == 0:
-        df.to_csv(args.out, encoding='utf-8')
+        COUNTER += 1
 
-    COUNTER += 1
+        sub = {
+            "uri": None,
+            "type": None,
+            "offset": None
+        }
+        obj = {
+            "uri": None,
+            "type": None,
+            "offset": None
+        }
 
-    sub = {
-        "uri": None,
-        "type": None,
-        "offset": None
-    }
-    obj = {
-        "uri": None,
-        "type": None,
-        "offset": None
-    }
+        # sub_type, obj_type = x.type.split("-")[0]
+        # entities = []
+        # types = []
 
-    # sub_type, obj_type = x.type.split("-")[0]
-    # entities = []
-    # types = []
+        try:
+            # shorten sentence to speedup.
 
-    try:
-        # shorten sentence to speedup.
+            es = spotlight.annotate(SPOTLIGHT_URL, x['sub'], SPOTLIGHT_CONF, SPOTLIGHT_SUPPORT)
+            eo = spotlight.annotate(SPOTLIGHT_URL, x['obj'], SPOTLIGHT_CONF, SPOTLIGHT_SUPPORT)
+            k = es + eo
 
-        es = spotlight.annotate(SPOTLIGHT_URL, x['sub'], SPOTLIGHT_CONF, SPOTLIGHT_SUPPORT)
-        eo = spotlight.annotate(SPOTLIGHT_URL, x['obj'], SPOTLIGHT_CONF, SPOTLIGHT_SUPPORT)
-        entities = es + eo
+            for e in k:
+                if e["surfaceForm"] == x['sub']:
+                    sub['uri'] = e['URI'].encode('utf-8')
+                    sub['type'] = [i.encode('utf-8') for i in e["types"].split(',') if i.startswith("DBpedia") and i != "DBpedia:Agent"]
+                    sub['offset'] = e['offset']
 
-        for e in entities:
-            if e["surfaceForm"] == x['sub']:
-                sub['uri'] = e['URI']
-                sub['type'] = [i for i in e["types"].split(',') if i.startswith("DBpedia")]
-                sub['offset'] = e['offset']
+                if e["surfaceForm"] == x['obj']:
+                    obj['uri'] = e['URI'].encode('utf-8')
+                    obj['type'] = [i.encode('utf-8') for i in e["types"].split(',') if i.startswith("DBpedia") and i != "DBpedia:Agent"]
+                    obj['offset'] = e['offset']
 
-            if e["surfaceForm"] == x['obj']:
-                obj['uri'] = e['URI']
-                obj['type'] = [i for i in e["types"].split(',') if i.startswith("DBpedia")]
-                obj['offset'] = e['offset']
+        except Exception as e:
+            print e.message
 
-    except Exception as e:
-        print e.message
+        try:
+            if sub['type'] is None and x.type.split("-")[0] in types_dict:
+                sub['type'] = types_dict[x.type.split("-")[0]]
 
-    if sub['type'] is None and x.type.split("-")[0] in types_dict:
-        sub['type'] = types_dict[x.type.split("-")[0]]
+            if obj['type'] is None and x.type.split("-")[1] in types_dict:
+                obj['type'] = types_dict[x.type.split("-")[1]]
+        except Exception as e:
+            print e.message
 
-    if obj['type'] is None and x.type.split("-")[1] in types_dict:
-        obj['type'] = types_dict[x.type.split("-")[1]]
-
-    return sub['uri'], sub['type'], sub['offset'], obj['uri'], obj['type'], obj['offset']
+        entities.append((sub['uri'], sub['type'], sub['offset'], obj['uri'], obj['type'], obj['offset']))
 
 
-def add_entities(df):
-    entities = lambda x: pd.Series(get_entities(x))
-    df[['sub_uri', 'sub_type', 'sub_offset', 'obj_uri', 'obj_type', 'obj_offset']] = df.apply(entities, axis=1)
-    return df
+# entities = lambda x: pd.Series(get_entities(x))
+# entities = df.apply(entities, axis=1)
+get_entities()
+E = zip(*entities)
+df['sub_uri'] = E[0]
+df['sub_type'] = E[1]
+df['sub_offset'] = E[2]
+df['obj_uri'] = E[3]
+df['obj_type'] = E[4]
+df['obj_offset'] = E[5]
 
-# df[['sub_uri', 'sub_type', 'sub_offset', 'obj_uri', 'obj_type', 'obj_offset']] = df.apply(entities, axis=1)
-df = parallelize_dataframe(df, add_entities)
-df.to_csv(args.out, encoding='utf-8')
+df.to_csv(args.out)
+
+# df[['sub_uri', 'sub_type', sub_offset', 'obj_uri', 'obj_type', 'obj_offset']] = df.apply(entities, axis=1)
+#df = parallelize_dataframe(df, add_entities)
+# df = add_entities(df)
+# df.to_csv(args.out, encoding='utf-8')
 
 st = df[df['sub_uri'].notnull()][df['obj_uri'].notnull()].shape[0]
 print "%s out of %s .. (%s percent) of the documents has been sucessfully tagged" % (st, df.shape[0], float(st)/df.shape[0])
