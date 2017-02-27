@@ -1,126 +1,94 @@
 __author__ = 'hadyelsahar'
 
 import pandas as pd
-from IPython.core.debugger import Tracer;
-from sklearn.cross_validation import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
+from IPython.core.debugger import Tracer; debug_here = Tracer()
 from sklearn.metrics import classification_report
 
-debug_here = Tracer()
 from sklearn.decomposition import PCA
 from evaluation.evaluation import ClusterEvaluation
-from sklearn import svm
-import itertools
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.feature_extraction.text import TfidfVectorizer
-from utils.glove import Glove
-
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from utils.glove import Glove_Vectorizer
+import numpy as np
+from nltk.tokenize import word_tokenize
+from unidecode import unidecode
 
 class Run:
     def __init__(self, df):
         """
 
         :param test_dataset:
+
         """
+        # selecting sentences with labels (a.k.a test set)
+        df = df[df.relation.notnull()]
 
         # Initializing Vectorizer
-
         print "loading Train Dataset"
+
+        # removing non parsable chars by nltk and scitkit learn
+        df['sentence'] = df.apply(lambda x: unidecode(x.sentence), axis=1)
+
+        # removing sentences longer than 500 words (bug in the provided datasets)
+        df['length'] = df.apply(lambda x: len((word_tokenize(x.sentence))), axis=1)
+        df = df[df.length < 500]
+
         self.data = df
 
 
-    def vectorize(self, f1=4, f2=4, f3=10, f4=100, f5=100):
+    def vectorize(self):
         """
         vectorize part of the input data
         :return: X
         """
 
+        #{name:"", feature:featureVectors, PCA:True, PCA_S=10}
+        self.features = []
+
         # Features Vectors:
         ###################
         # Sentence Features
-        countvectorizer = CountVectorizer()
-        sent_count = countvectorizer.fit_transform(self.data['sentence'].values).toarray()
-        tfidf = TfidfVectorizer()
-        sent_tfidf = tfidf.fit_transform(self.data['sentence'].values).toarray()
         idf = TfidfVectorizer(binary=True)
-        sent_count = idf.fit_transform(self.data['sentence'].values).toarray()
+        s_idf = idf.fit_transform(self.data['sentence'].values).toarray()
+
         # Sentence With Entities Replaced by Types
-        ss = self.data.apply(lambda x: x['sentence'].replace(x['sub'],x['type'].split('-')[0]).replace(x['obj'], x['type'].split('-')[1]), axis=1)
-        countvectorizer = CountVectorizer()
-        ss_count = countvectorizer.fit_transform(ss).toarray()
-        tfidf = TfidfVectorizer()
-        ss_tfidf = tfidf.fit_transform(ss).toarray()
-        idf = TfidfVectorizer(binary=True)
-        ss_count = idf.fit_transform(ss).toarray()
+        # ss = self.data.apply(lambda x: x['sentence'].replace(x['sub'], x['type'].split('-')[0]).replace(x['obj'], x['type'].split('-')[1]), axis=1)
+        # countvectorizer = CountVectorizer()
+        # ss_count = countvectorizer.fit_transform(ss).toarray()
+        # tfidf = TfidfVectorizer()
+        # ss_tfidf = tfidf.fit_transform(ss).toarray()
+        # idf = TfidfVectorizer(binary=True)
+        # ss_idf= idf.fit_transform(ss).toarray()
 
+        # Sentence Glove Word2Vec
+        glove_vectorizer = Glove_Vectorizer('/media/disk/code/relation-discovery-2-entities/utils/word-embeddings/glove/glove.6B/glove.6B.100d.txt')
+        glove_vectorizer.fit(self.data['sentence'].values)
+        w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
+        self.w2v = w2v
+        ###### Adding Features ####
+        self.features += [
+             {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10},
+            # {'name': "sentence_prep_count", 'feature': ss_count, 'PCA': True, 'PCA_size': 10},
+            # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
+            # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10}
+            {'name': "word2vec_sum", 'feature': w2v, 'PCA': False}
+        ]
 
-        subjectnorm = np.array(self.data.subjectnorm.values.tolist())
-        objectnorm = np.array(self.data.objectnorm.values.tolist())
+        tmp = []
+        for f in self.features:
+            if f['PCA']:
+                pca = PCA(n_components=f['PCA_size'])
+                tmp.append(pca.fit_transform(f['feature']))
+            else:
+                tmp.append(f['feature'])
 
-        # attr = [x.replace("in","").replace("to","").replace("on","").replace("at","") for x in self.data.A.values]
-        w2v = self.word2vecvectorizer.fit_transform(self.data.A.values)
-        w2v = np.array([np.average(j, axis=0) for j in w2v])
-        np.random.seed(3)
-
-        # TFIDF Weighted sum of word vectors:
-        tfidfvec = TfidfVectorizer()
-
-        tfidfvec.fit(self.all_attributes)
-        tfidf = tfidfvec.fit_transform(self.data.A.values)
-
-        ww2v = np.zeros((self.data.shape[0], self.word2vecvectorizer.model.vector_size))
-        tfidf_feature_names = tfidfvec.get_feature_names()
-        tfidf_feature_w2v = np.array([self.word2vecvectorizer.word2vec(w) for w in tfidf_feature_names])
-        for i, a in enumerate(tfidf.todense()):
-            r = np.multiply(tfidf_feature_w2v, a.transpose())
-            r = np.sum(r, axis=0) / len(self.data["tokens"].values[i])
-            ww2v[i:] = r
-
-        np.random.seed(3)
-
-        # dirrand = {1:one, -1: negone}
-
-        dir = np.array([i for i in self.data.direction.values.tolist()]).reshape([-1, 1])
-
-        # has preposition #used for detection of direction
-
-        pca = PCA(n_components=f1)
-        pos = pca.fit_transform(pos)
-        pca = PCA(n_components=f2)
-        dep = pca.fit_transform(dep)
-
-        dirtype = np.hstack((
-            dir,
-            subjectnorm,
-            objectnorm,
-        ))
-
-        pca = PCA(n_components=f3)
-        dirtype = pca.fit_transform(dirtype)
-
-        X1 = np.hstack((
-            pos,
-            dep,
-            dirtype
-        ))
-
-        pca = PCA(n_components=f4)
-        w2v = pca.fit_transform(w2v)
-        pca = PCA(n_components=f5)
-        ww2v = pca.fit_transform(ww2v)
-
-        X = np.hstack((
-            X1,
-            w2v,
-            ww2v,
-        ))
-
+        X = np.hstack(tmp)
         # print "returning dense"
         self.vectorizeddata = X
 
         return self.vectorizeddata
 
-    def cluster(self, x, clustering=None, n_clusters=6):
+    def cluster(self, x, y, clustering=None, n_clusters=6):
 
         # print "Starting Kmeans clustering.."
         if clustering is None:
@@ -130,32 +98,40 @@ class Run:
         # print "done Kmeans clustering.."
         self.clusters = predictions_minibatch
 
-        e = ClusterEvaluation(self.data.label, predictions_minibatch)
+        e = ClusterEvaluation(y, predictions_minibatch)
         m = e.printEvaluation()
 
         return m
 
-    def tune_clustering(self):
-        f1s = range(5, 10, 1) + [1]
-        f2s = range(8, 12, 1) + [0]
-        f3s = range(5, 10, 1) + [0]
-        f4s = range(50, 300, 50)
-        f5s = range(50, 300, 50)
-        # f1s = [0]
-        # f2s = [0]
-        # f3s = [0]
-        # f4s = [0]
-        # f5s = [0]
+    # def tune_clustering(self):
+    #     f1s = range(5, 10, 1) + [1]
+    #     f2s = range(8, 12, 1) + [0]
+    #     f3s = range(5, 10, 1) + [0]
+    #     f4s = range(50, 300, 50)
+    #     f5s = range(50, 300, 50)
+    #     # f1s = [0]
+    #     # f2s = [0]
+    #     # f3s = [0]
+    #     # f4s = [0]
+    #     # f5s = [0]
+    #
+    #     results = []
+    #     self.results = []
+    #     maxf = 0
+    #     for f1, f2, f3, f4, f5 in list(itertools.product(f1s, f2s, f3s, f4s, f5s)):
+    #
+    #         self.vectorize(f1, f2, f3, f4, f5)
+    #         fscore = self.cluster(self.vectorizeddata, AgglomerativeClustering, n_clusters=5)['Elementwise B3 F1']
+    #         results.append([fscore, f1, f2, f3, f4, f5])
+    #         self.results = results
+    #         if fscore > maxf:
+    #             maxf = fscore
+    #             print "%s %s %s %s %s --> %s" % (f1, f2, f3, f4, f5, fscore)
 
-        results = []
-        self.results = []
-        maxf = 0
-        for f1, f2, f3, f4, f5 in list(itertools.product(f1s, f2s, f3s, f4s, f5s)):
 
-            self.vectorize(f1, f2, f3, f4, f5)
-            fscore = self.cluster(self.vectorizeddata, AgglomerativeClustering, n_clusters=5)['Elementwise B3 F1']
-            results.append([fscore, f1, f2, f3, f4, f5])
-            self.results = results
-            if fscore > maxf:
-                maxf = fscore
-                print "%s %s %s %s %s --> %s" % (f1, f2, f3, f4, f5, fscore)
+if __name__ == "__main__":
+
+    df = pd.read_csv('./data/diego-NYT-FB/diego-dataset-test.csv')
+    r = Run(df)
+    r.vectorize()
+    r.cluster(r.vectorizeddata, r.data.relation)
