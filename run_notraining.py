@@ -30,7 +30,7 @@ class Run:
         print "loading Train Dataset"
 
         # removing non parsable chars by nltk and scitkit learn
-        df['sentence'] = df.apply(lambda x: unidecode(x.sentence), axis=1)
+        df['sentence'] = df.apply(lambda x: x.sentence.decode('utf-8', 'ignore').encode("utf-8"), axis=1)
 
         # removing sentences longer than 500 words (bug in the provided datasets)
         df['length'] = df.apply(lambda x: len((word_tokenize(x.sentence))), axis=1)
@@ -149,5 +149,6 @@ if __name__ == "__main__":
     r.vectorize()
     m = r.cluster(r.vectorizeddata, n_clusters=int(args.nclusters))
     print m
+
 
 
