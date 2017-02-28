@@ -109,11 +109,5 @@ df['obj_type'] = E[4]
 df['obj_offset'] = E[5]
 
 df.to_csv(args.out)
-
-# df[['sub_uri', 'sub_type', sub_offset', 'obj_uri', 'obj_type', 'obj_offset']] = df.apply(entities, axis=1)
-#df = parallelize_dataframe(df, add_entities)
-# df = add_entities(df)
-# df.to_csv(args.out, encoding='utf-8')
-
 st = df[df['sub_uri'].notnull()][df['obj_uri'].notnull()].shape[0]
 print "%s out of %s .. (%s percent) of the documents has been sucessfully tagged" % (st, df.shape[0], float(st)/df.shape[0])
