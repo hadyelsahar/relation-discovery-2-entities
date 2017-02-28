@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--nclusters', help="glove file")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.input)[0:10000]
+    df = pd.read_csv(args.input)
 
     r = Run(df, args.glovefile)
     r.vectorize()
