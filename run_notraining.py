@@ -2,16 +2,15 @@ __author__ = 'hadyelsahar'
 
 import pandas as pd
 from IPython.core.debugger import Tracer; debug_here = Tracer()
-from sklearn.metrics import classification_report
 
 from sklearn.decomposition import PCA
 from evaluation.evaluation import ClusterEvaluation
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from utils.glove import GloveVectorizer
+from utils.vectorizers.glovevectorizer import GloveVectorizer
+from utils.vectorizers.typevectorizer import TypeVectorizer
 import numpy as np
 from nltk.tokenize import word_tokenize
-from unidecode import unidecode
 import argparse
 
 class Run:
@@ -36,6 +35,7 @@ class Run:
         df['length'] = df.apply(lambda x: len((word_tokenize(x.sentence))), axis=1)
         df = df[df.length < 500]
 
+
         self.data = df
         self.labels = df.relation.values
 
@@ -51,9 +51,12 @@ class Run:
 
         # Features Vectors:
         ###################
-        # Sentence Features
-        idf = TfidfVectorizer(binary=True)
-        s_idf = idf.fit_transform(self.data['sentence'].values).toarray()
+
+        #####################
+        # Sentence Features #
+        #####################
+        # idf = TfidfVectorizer(binary=True)
+        # s_idf = idf.fit_transform(self.data['sentence'].values).toarray()
 
         # Sentence With Entities Replaced by Types
         # ss = self.data.apply(lambda x: x['sentence'].replace(x['sub'], x['type'].split('-')[0]).replace(x['obj'], x['type'].split('-')[1]), axis=1)
@@ -70,14 +73,38 @@ class Run:
         # w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
         w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, idf=True)
 
+        ##################
+        # Types Features #
+        ##################
+        typevectorizer = TypeVectorizer()
+
+        type_sub = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[0]] for i in self.data.type.values]))
+        type_obj = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[1]] for i in self.data.type.values]))
+        type_sub_obj = typevectorizer.fit_transform_onehot(np.array([[i] for i in self.data.type.values]))
+
+
+        # KB Types:
+        kbtype_sub = typevectorizer.fit_transform_onehot(self.data.sub_type.values)
+        kbtype_obj = typevectorizer.fit_transform_onehot(self.data.obj_type.values)
+
+        self.typevectorizer = typevectorizer
+
         self.w2v = w2v
         ###### Adding Features ####
         self.features += [
+            ### sentences ###
             # {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_count", 'feature': ss_count, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
-            # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10}
-            {'name': "word2vec_sum", 'feature': w2v, 'PCA': False}
+            # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10},
+            # {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20},
+            ### types ###
+            {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
+            {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
+            # {'name': "type_sub_obj", 'feature': type_sub_obj, 'PCA': True, 'PCA_size': 4},
+            # KB Types ##
+            {'name': "kbtype_sub", 'feature': kbtype_sub, 'PCA': True, 'PCA_size': 10},
+            {'name': "kbtype_obj", 'feature': kbtype_obj, 'PCA': True, 'PCA_size': 10},
         ]
 
         tmp = []
@@ -109,31 +136,6 @@ class Run:
 
         return m
 
-    # def tune_clustering(self):
-    #     f1s = range(5, 10, 1) + [1]
-    #     f2s = range(8, 12, 1) + [0]
-    #     f3s = range(5, 10, 1) + [0]
-    #     f4s = range(50, 300, 50)
-    #     f5s = range(50, 300, 50)
-    #     # f1s = [0]
-    #     # f2s = [0]
-    #     # f3s = [0]
-    #     # f4s = [0]
-    #     # f5s = [0]
-    #
-    #     results = []
-    #     self.results = []
-    #     maxf = 0
-    #     for f1, f2, f3, f4, f5 in list(itertools.product(f1s, f2s, f3s, f4s, f5s)):
-    #
-    #         self.vectorize(f1, f2, f3, f4, f5)
-    #         fscore = self.cluster(self.vectorizeddata, AgglomerativeClustering, n_clusters=5)['Elementwise B3 F1']
-    #         results.append([fscore, f1, f2, f3, f4, f5])
-    #         self.results = results
-    #         if fscore > maxf:
-    #             maxf = fscore
-    #             print "%s %s %s %s %s --> %s" % (f1, f2, f3, f4, f5, fscore)
-
 
 if __name__ == "__main__":
 
@@ -145,10 +147,16 @@ if __name__ == "__main__":
 
     df = pd.read_csv(args.input)
 
+    def fixtype(s):
+        if s > 1:
+            return eval(s)
+        else:
+            return []
+
+    df['sub_type'] = df.apply(lambda x: fixtype(x.sub_type), axis=1)
+    df['obj_type'] = df.apply(lambda x: fixtype(x.obj_type), axis=1)
+
     r = Run(df, args.glovefile)
     r.vectorize()
     m = r.cluster(r.vectorizeddata, n_clusters=int(args.nclusters))
     print m
-
-
-
