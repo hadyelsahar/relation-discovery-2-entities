@@ -4,7 +4,7 @@ from collections import defaultdict
 from nltk.tokenize import word_tokenize
 
 
-class Glove_Vectorizer:
+class GloveVectorizer:
 
     def __init__(self, fname, tokenizer_func=None):
         """
@@ -46,6 +46,7 @@ class Glove_Vectorizer:
         # will be filled after calling fit function
         self.word_index = None
         self.word_counts = None
+        self.doc_counts = None
         self.inverse_word_index = None
         self.trimmed_word_index = None
 
@@ -55,10 +56,16 @@ class Glove_Vectorizer:
         :return:
         """
         max_seq_length = 0
-        word_counts = defaultdict(lambda: 1)
+        word_counts = defaultdict(lambda: 0)
+        doc_counts = defaultdict(lambda: 1)
         for doc in X:
             sl = 0
-            for w in self.tokenize(doc):
+            tokens = self.tokenize(doc)
+
+            for w in set(tokens):
+                doc_counts[w] += 1
+
+            for w in tokens:
                 sl += 1
                 word_counts[w] += 1
             max_seq_length = sl if sl > max_seq_length else max_seq_length
@@ -68,9 +75,16 @@ class Glove_Vectorizer:
         word_counts = dict(word_counts)
         word_counts = sorted(word_counts.items(), reverse=True, key=operator.itemgetter(1))
 
+        doc_words = doc_counts.keys()
+        doc_ids = np.array(doc_counts.values())/float(X.shape[0])
+        self.doc_counts = dict(zip(doc_words, doc_ids))
+        self.doc_counts["__PADDING__"] = 0
+        self.doc_counts["__OOV_WORD__"] = 0
+
         self.word_index = dict()
         self.word_index["__PADDING__"] = self.pad_id
         self.word_index["__OOV_WORD__"] = self.oov_id
+
 
         self.word_counts = dict()
         for i, (w, c) in enumerate(word_counts):
@@ -81,7 +95,6 @@ class Glove_Vectorizer:
 
     def transform_id(self, X, max_vocabulary=None, seq_length=None):
         """
-
         :param X:
         :param max_vocabulary:
         :param seq_length:
@@ -95,7 +108,6 @@ class Glove_Vectorizer:
 
         for i, doc in enumerate(X):
             for j, w in enumerate(self.tokenize(doc)):
-                print j
                 # respect max seq length
                 if j >= vX.shape[1]:
                     break
@@ -117,7 +129,7 @@ class Glove_Vectorizer:
 
         return vX
 
-    def transform_sumembed(self, X, max_vocabulary=None, seq_length=None, average=False, weights=None):
+    def transform_sumembed(self, X, max_vocabulary=None, seq_length=None, average=False, idf=False):
         """
         a function to transform a set of sentences to a per-sentence vector containing
          the sum, average of weighted average of the word vectors.
@@ -144,25 +156,24 @@ class Glove_Vectorizer:
 
                     sent_emb[j] = self.embeddings[self.inverse_word_index[wid]]
 
-                    if weights is not None:
-                        sent_emb[j] = sent_emb[j] * weights(w)
+                    if idf:
+                        sent_emb[j] = sent_emb[j] * self.doc_counts[w]
 
                 else:
                     sent_emb[j] = self.embeddings[self.inverse_word_index[self.oov_id]]
 
-                    if weights is not None:
-                        sent_emb[j] = sent_emb[j] * weights(w)
+                    if idf:
+                        sent_emb[j] = sent_emb[j] * self.doc_counts[w]
 
             sent_emb = sent_emb.sum(axis=0)
-            if average and weights is None:
+            if average and not idf:
                 actual_length = len([l for l in x if l != self.pad_id])
                 print actual_length
-                sent_emb /= actual_length
+                sent_emb /= float(actual_length)
 
             X_emb[i] = sent_emb
 
         return X_emb
-
 
     def transform(self, X, max_vocabulary=None, seq_length=None):
 
@@ -182,5 +193,3 @@ class Glove_Vectorizer:
                     X_emb[i, j, :] = self.embeddings[self.inverse_word_index[self.oov_id]]
 
         return X_emb
-
-

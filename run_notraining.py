@@ -8,19 +8,22 @@ from sklearn.decomposition import PCA
 from evaluation.evaluation import ClusterEvaluation
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from utils.glove import Glove_Vectorizer
+from utils.glove import GloveVectorizer
 import numpy as np
 from nltk.tokenize import word_tokenize
 from unidecode import unidecode
+import argparse
 
 class Run:
-    def __init__(self, df):
+    def __init__(self, df, glovefile):
         """
 
         :param test_dataset:
 
         """
+        self.glovefile = glovefile
         # selecting sentences with labels (a.k.a test set)
+
         df = df[df.relation.notnull()]
 
         # Initializing Vectorizer
@@ -34,6 +37,7 @@ class Run:
         df = df[df.length < 500]
 
         self.data = df
+        self.labels = df.relation.values
 
 
     def vectorize(self):
@@ -61,13 +65,15 @@ class Run:
         # ss_idf= idf.fit_transform(ss).toarray()
 
         # Sentence Glove Word2Vec
-        glove_vectorizer = Glove_Vectorizer('/media/disk/code/relation-discovery-2-entities/utils/word-embeddings/glove/glove.6B/glove.6B.100d.txt')
+        glove_vectorizer = GloveVectorizer(self.glovefile)
         glove_vectorizer.fit(self.data['sentence'].values)
-        w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
+        # w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
+        w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, idf=True)
+
         self.w2v = w2v
         ###### Adding Features ####
         self.features += [
-             {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10},
+            # {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_count", 'feature': ss_count, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10}
@@ -88,7 +94,7 @@ class Run:
 
         return self.vectorizeddata
 
-    def cluster(self, x, y, clustering=None, n_clusters=6):
+    def cluster(self, x, clustering=None, n_clusters=6):
 
         # print "Starting Kmeans clustering.."
         if clustering is None:
@@ -98,7 +104,7 @@ class Run:
         # print "done Kmeans clustering.."
         self.clusters = predictions_minibatch
 
-        e = ClusterEvaluation(y, predictions_minibatch)
+        e = ClusterEvaluation(self.labels, predictions_minibatch)
         m = e.printEvaluation()
 
         return m
@@ -131,7 +137,17 @@ class Run:
 
 if __name__ == "__main__":
 
-    df = pd.read_csv('./data/diego-NYT-FB/diego-dataset-test.csv')
-    r = Run(df)
+    parser = argparse.ArgumentParser(description='this file is for building no training features for diego et al. dataset and be able to classify them')
+    parser.add_argument('-i', '--input', help="dataset file")
+    parser.add_argument('-g', '--glovefile', help="glove file")
+    parser.add_argument('-n', '--nclusters', help="glove file")
+    args = parser.parse_args()
+
+    df = pd.read_csv(args.input)[0:10000]
+
+    r = Run(df, args.glovefile)
     r.vectorize()
-    r.cluster(r.vectorizeddata, r.data.relation)
+    m = r.cluster(r.vectorizeddata, n_clusters=int(args.nclusters))
+    print m
+
+
