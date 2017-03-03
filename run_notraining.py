@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--nclusters', help="glove file")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.input)[0:100000]
+    df = pd.read_csv(args.input)
     df = df[df.relation.notnull()][df.sentence.notnull()]
 
     # def fixtype(s):
