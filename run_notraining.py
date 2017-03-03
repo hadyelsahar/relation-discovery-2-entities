@@ -103,14 +103,14 @@ class Run:
             # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10},
             # {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20},
-            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, "PCA":False}
+            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, 'PCA_size': 10},
             ### types ###
-            # {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
-            # {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
+            {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
+            {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
             # {'name': "type_sub_obj", 'feature': type_sub_obj, 'PCA': True, 'PCA_size': 4},
             # KB Types ##
-            # {'name': "kbtype_sub", 'feature': kbtype_sub, 'PCA': True, 'PCA_size': 10},
-            # {'name': "kbtype_obj", 'feature': kbtype_obj, 'PCA': True, 'PCA_size': 10},
+            {'name': "kbtype_sub", 'feature': kbtype_sub, 'PCA': True, 'PCA_size': 5},
+            {'name': "kbtype_obj", 'feature': kbtype_obj, 'PCA': True, 'PCA_size': 5},
         ]
 
         tmp = []
@@ -154,14 +154,14 @@ if __name__ == "__main__":
     df = pd.read_csv(args.input)
     df = df[df.relation.notnull()][df.sentence.notnull()]
 
-    # def fixtype(s):
-    #     if s > 1:
-    #         return eval(s)
-    #     else:
-    #         return []
-    #
-    # df['sub_type'] = df.apply(lambda x: fixtype(x.sub_type), axis=1)
-    # df['obj_type'] = df.apply(lambda x: fixtype(x.obj_type), axis=1)
+    def fixtype(s):
+        if s > 1:
+            return eval(s)
+        else:
+            return []
+
+    df['sub_type'] = df.apply(lambda x: fixtype(x.sub_type), axis=1)
+    df['obj_type'] = df.apply(lambda x: fixtype(x.obj_type), axis=1)
 
     r = Run(df, args.glovefile)
     r.vectorize()
