@@ -129,7 +129,7 @@ class GloveVectorizer:
 
         return vX
 
-    def transform_sumembed(self, X, max_vocabulary=None, seq_length=None, average=False, idf=False):
+    def transform_sumembed(self, X, max_vocabulary=None, seq_length=None, average=False, idf=False, weights=None):
         """
         a function to transform a set of sentences to a per-sentence vector containing
          the sum, average of weighted average of the word vectors.
@@ -159,11 +159,17 @@ class GloveVectorizer:
                     if idf:
                         sent_emb[j] = sent_emb[j] * self.doc_counts[w]
 
+                    if weights is not None:
+                        sent_emb[j] = sent_emb[j] * weights[i][j]
+
                 else:
                     sent_emb[j] = self.embeddings[self.inverse_word_index[self.oov_id]]
 
                     if idf:
                         sent_emb[j] = sent_emb[j] * self.doc_counts[w]
+
+                    if weights is not None:
+                        sent_emb[j] = sent_emb[j] * weights[i][j]
 
             sent_emb = sent_emb.sum(axis=0)
             if average and not idf:
@@ -193,3 +199,4 @@ class GloveVectorizer:
                     X_emb[i, j, :] = self.embeddings[self.inverse_word_index[self.oov_id]]
 
         return X_emb
+

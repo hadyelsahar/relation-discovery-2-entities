@@ -9,6 +9,7 @@ from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from utils.vectorizers.glovevectorizer import GloveVectorizer
 from utils.vectorizers.typevectorizer import TypeVectorizer
+from utils.vectorizers.attention_vectorizer import DepAttentionVectorizer
 import numpy as np
 from nltk.tokenize import word_tokenize
 import argparse
@@ -34,7 +35,6 @@ class Run:
         # removing sentences longer than 500 words (bug in the provided datasets)
         df['length'] = df.apply(lambda x: len((word_tokenize(x.sentence))), axis=1)
         df = df[df.length < 500]
-
 
         self.data = df
         self.labels = df.relation.values
@@ -73,21 +73,26 @@ class Run:
         # w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
         w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, idf=True)
 
+        # Dependency re-weighted word vectors:
+        depattvectorizer = DepAttentionVectorizer()
+        dep_atention = depattvectorizer.transform(self.data['sentence'].values, self.data['dep'].values, glove_vectorizer.max_seq_length)
+        depattention_ww2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, weights=dep_atention)
+
         ##################
         # Types Features #
         ##################
-        typevectorizer = TypeVectorizer()
-
-        type_sub = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[0]] for i in self.data.type.values]))
-        type_obj = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[1]] for i in self.data.type.values]))
-        type_sub_obj = typevectorizer.fit_transform_onehot(np.array([[i] for i in self.data.type.values]))
-
-
+        # typevectorizer = TypeVectorizer()
+        #
+        # type_sub = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[0]] for i in self.data.type.values]))
+        # type_obj = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[1]] for i in self.data.type.values]))
+        # type_sub_obj = typevectorizer.fit_transform_onehot(np.array([[i] for i in self.data.type.values]))
+        #
+        #
         # KB Types:
-        kbtype_sub = typevectorizer.fit_transform_onehot(self.data.sub_type.values)
-        kbtype_obj = typevectorizer.fit_transform_onehot(self.data.obj_type.values)
-
-        self.typevectorizer = typevectorizer
+        # kbtype_sub = typevectorizer.fit_transform_onehot(self.data.sub_type.values)
+        # kbtype_obj = typevectorizer.fit_transform_onehot(self.data.obj_type.values)
+        #
+        # self.typevectorizer = typevectorizer
 
         self.w2v = w2v
         ###### Adding Features ####
@@ -98,13 +103,14 @@ class Run:
             # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10},
             # {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20},
+            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, "PCA":False}
             ### types ###
-            {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
-            {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
+            # {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
+            # {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
             # {'name': "type_sub_obj", 'feature': type_sub_obj, 'PCA': True, 'PCA_size': 4},
             # KB Types ##
-            {'name': "kbtype_sub", 'feature': kbtype_sub, 'PCA': True, 'PCA_size': 10},
-            {'name': "kbtype_obj", 'feature': kbtype_obj, 'PCA': True, 'PCA_size': 10},
+            # {'name': "kbtype_sub", 'feature': kbtype_sub, 'PCA': True, 'PCA_size': 10},
+            # {'name': "kbtype_obj", 'feature': kbtype_obj, 'PCA': True, 'PCA_size': 10},
         ]
 
         tmp = []
@@ -145,16 +151,17 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--nclusters', help="glove file")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.input)
+    df = pd.read_csv(args.input)[0:100000]
+    df = df[df.relation.notnull()][df.sentence.notnull()]
 
-    def fixtype(s):
-        if s > 1:
-            return eval(s)
-        else:
-            return []
-
-    df['sub_type'] = df.apply(lambda x: fixtype(x.sub_type), axis=1)
-    df['obj_type'] = df.apply(lambda x: fixtype(x.obj_type), axis=1)
+    # def fixtype(s):
+    #     if s > 1:
+    #         return eval(s)
+    #     else:
+    #         return []
+    #
+    # df['sub_type'] = df.apply(lambda x: fixtype(x.sub_type), axis=1)
+    # df['obj_type'] = df.apply(lambda x: fixtype(x.obj_type), axis=1)
 
     r = Run(df, args.glovefile)
     r.vectorize()
