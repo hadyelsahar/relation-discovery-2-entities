@@ -81,18 +81,18 @@ class Run:
         ##################
         # Types Features #
         ##################
-        # typevectorizer = TypeVectorizer()
-        #
-        # type_sub = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[0]] for i in self.data.type.values]))
-        # type_obj = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[1]] for i in self.data.type.values]))
-        # type_sub_obj = typevectorizer.fit_transform_onehot(np.array([[i] for i in self.data.type.values]))
-        #
-        #
+        typevectorizer = TypeVectorizer()
+
+        type_sub = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[0]] for i in self.data.type.values]))
+        type_obj = typevectorizer.fit_transform_onehot(np.array([[i.split('-')[1]] for i in self.data.type.values]))
+        type_sub_obj = typevectorizer.fit_transform_onehot(np.array([[i] for i in self.data.type.values]))
+
+
         # KB Types:
-        # kbtype_sub = typevectorizer.fit_transform_onehot(self.data.sub_type.values)
-        # kbtype_obj = typevectorizer.fit_transform_onehot(self.data.obj_type.values)
-        #
-        # self.typevectorizer = typevectorizer
+        kbtype_sub = typevectorizer.fit_transform_onehot(self.data.sub_type.values)
+        kbtype_obj = typevectorizer.fit_transform_onehot(self.data.obj_type.values)
+
+        self.typevectorizer = typevectorizer
 
         self.w2v = w2v
         ###### Adding Features ####
