@@ -103,7 +103,7 @@ class Run:
             # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10},
             # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10},
             # {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20},
-            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, 'PCA_size': 10},
+            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, 'PCA': True, 'PCA_size': 10},
             ### types ###
             {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2},
             {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2},
