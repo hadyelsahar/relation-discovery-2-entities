@@ -56,28 +56,28 @@ class Run:
         #####################
         # Sentence Features #
         #####################
-        idf = TfidfVectorizer(binary=True)
-        s_idf = idf.fit_transform(self.data['sentence'].values).toarray()
+        # tfidf = TfidfVectorizer()
+        # s_tfidf = tfidf.fit_transform(self.data['sentence'].values).toarray()
 
         # Sentence With Entities Replaced by Types
         ss = self.data.apply(lambda x: x['sentence'].replace(x['sub'], x['type'].split('-')[0]).replace(x['obj'], x['type'].split('-')[1]), axis=1)
-        countvectorizer = CountVectorizer()
-        ss_count = countvectorizer.fit_transform(ss).toarray()
-        tfidf = TfidfVectorizer()
-        ss_tfidf = tfidf.fit_transform(ss).toarray()
-        idf = TfidfVectorizer(binary=True)
-        ss_idf= idf.fit_transform(ss).toarray()
+        # countvectorizer = CountVectorizer()
+        # ss_count = countvectorizer.fit_transform(ss).toarray()
+        # tfidf = TfidfVectorizer()
+        # ss_tfidf = tfidf.fit_transform(ss).toarray()
+        # idf = TfidfVectorizer(binary=True)
+        # ss_idf= idf.fit_transform(ss).toarray()
 
         # Sentence Glove Word2Vec
         glove_vectorizer = GloveVectorizer(self.glovefile)
         glove_vectorizer.fit(self.data['sentence'].values)
-        # w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, average=True)
+        # w2v = glove_vectorizer.transform_sumembed(ss)
         w2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, idf=True)
 
         # Dependency re-weighted word vectors:
         depattvectorizer = DepAttentionVectorizer()
-        dep_atention = depattvectorizer.transform(self.data['sentence'].values, self.data['dep'].values, glove_vectorizer.max_seq_length)
-        depattention_ww2v = glove_vectorizer.transform_sumembed(self.data['sentence'].values, weights=dep_atention)
+        dep_atention = depattvectorizer.transform(ss, self.data['dep'].values, glove_vectorizer.max_seq_length)
+        depattention_ww2v = glove_vectorizer.transform_sumembed(ss, weights=dep_atention)
 
         ##################
         # Types Features #
@@ -95,16 +95,17 @@ class Run:
 
         self.typevectorizer = typevectorizer
 
-        self.w2v = w2v
+        # self.w2v = w2v
         ###### Adding Features ####
         self.features += [
             ### sentences ###
-            {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
-            {'name': "sentence_prep_count", 'feature': ss_count, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
-            {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
-            {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
-            {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20, 'PCA_test_range': range(0, 100, 20)},
-            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "sentence_tfidf", 'feature': s_tfidf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "sentence_idf", 'feature': s_idf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "sentence_prep_count", 'feature': ss_count, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "sentence_prep_tfidf", 'feature': ss_tfidf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "sentence_prep_idf", 'feature': ss_idf, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 20)},
+            # {'name': "word2vec_sum", 'feature': w2v, 'PCA': True, 'PCA_size': 20, 'PCA_test_range': range(0, 100, 20)},
+            {'name': "dependency_attention_w2v", 'feature': depattention_ww2v, 'PCA': True, 'PCA_size': 10, 'PCA_test_range': range(0, 100, 10)},
             ### types ###
             {'name': "type_sub", 'feature': type_sub, 'PCA': True, 'PCA_size': 2, 'PCA_test_range': range(0, 5, 1)},
             {'name': "type_obj", 'feature': type_obj, 'PCA': True, 'PCA_size': 2, 'PCA_test_range': range(0, 5, 1)},
