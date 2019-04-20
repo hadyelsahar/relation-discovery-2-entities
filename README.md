@@ -1,10 +1,6 @@
-# relation-discovery-2-entities
-unsupervised relation discovery between two entities
-
-
-
-
-##Loading tutorial
+# unsupervised relation discovery between two entities
+Unsupervised Open Relation Extraction. ESWC (Satellite Events) 2017: 12-16
+Hady ElSahar, Elena Demidova, Simon Gottschalk, Christophe Gravier, Frédérique Laforest:
 
 ### Loading the CoreNLP Server and get it running 
 
